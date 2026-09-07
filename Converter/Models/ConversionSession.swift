@@ -32,6 +32,9 @@ final class ConversionSession: ObservableObject, Identifiable {
     @Published var customHeight: Int
     @Published var maintainAspectRatio = true
     @Published var quality: Int
+    /// Replaces the manual quality slider for Resize sessions: an automatic size/quality search
+    /// instead of a number to pick, the way compressjpeg.com or TinyPNG work.
+    @Published var compress = false
     @Published private(set) var state: ConversionSessionState = .configuring
 
     private var runningTask: Task<Void, Never>?
@@ -97,7 +100,9 @@ final class ConversionSession: ObservableObject, Identifiable {
             sourceFileURLs: files.map(\.url),
             targetFormat: targetFormat,
             resize: resolvedResize,
-            quality: targetFormat.supportsQuality ? quality : nil
+            quality: targetFormat.supportsQuality ? quality : nil,
+            compress: isResizeOnly && compress,
+            isResizeOnly: isResizeOnly
         )
         state = .converting(completed: 0, total: files.count)
 

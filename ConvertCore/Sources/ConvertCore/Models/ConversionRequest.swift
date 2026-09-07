@@ -11,6 +11,8 @@ public struct ConversionRequest: Codable, Identifiable, Equatable, Sendable {
     public var resize: ResizeSpec
     public var quality: Int?
     public var keepOriginal: Bool
+    public var compress: Bool
+    public var isResizeOnly: Bool
 
     public init(
         id: UUID = UUID(),
@@ -18,7 +20,9 @@ public struct ConversionRequest: Codable, Identifiable, Equatable, Sendable {
         targetFormat: OutputFormat,
         resize: ResizeSpec = .original,
         quality: Int? = nil,
-        keepOriginal: Bool = true
+        keepOriginal: Bool = true,
+        compress: Bool = false,
+        isResizeOnly: Bool = false
     ) {
         self.id = id
         self.sourceFileURLs = sourceFileURLs
@@ -26,6 +30,8 @@ public struct ConversionRequest: Codable, Identifiable, Equatable, Sendable {
         self.resize = resize
         self.quality = quality.map { max(1, min(100, $0)) }
         self.keepOriginal = keepOriginal
+        self.compress = compress
+        self.isResizeOnly = isResizeOnly
     }
 
     /// Expands the batch into one `ConversionJob` per source file.
@@ -36,7 +42,9 @@ public struct ConversionRequest: Codable, Identifiable, Equatable, Sendable {
                 targetFormat: targetFormat,
                 resize: resize,
                 quality: quality,
-                keepOriginal: keepOriginal
+                keepOriginal: keepOriginal,
+                compress: compress,
+                isResizeOnly: isResizeOnly
             )
         }
     }

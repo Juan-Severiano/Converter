@@ -13,7 +13,12 @@ public enum ConversionEngine {
         guard let kind = FileTypeDetector.detect(fileURL: job.sourceURL) else {
             throw ConversionError.unsupportedInputFormat
         }
-        guard FileTypeDetector.availableOutputFormats(for: kind).contains(job.targetFormat) else {
+        // Same-format targets are excluded from the "Convert to X" menu (no PNG -> PNG) and stay
+        // rejected there. A standalone Resize job legitimately re-encodes to the source's own
+        // format, so it's the one case allowed back in.
+        let formatAllowed = FileTypeDetector.availableOutputFormats(for: kind).contains(job.targetFormat)
+            || (job.isResizeOnly && job.targetFormat == kind.matchingOutputFormat)
+        guard formatAllowed else {
             throw ConversionError.unsupportedOutputFormat(job.targetFormat)
         }
 
@@ -37,7 +42,11 @@ public enum ConversionEngine {
 
         let encodedData: Data
         do {
-            encodedData = try ImageEncoder.encode(renderedImage, format: job.targetFormat, quality: job.quality)
+            if job.compress, job.targetFormat.supportsQuality {
+                encodedData = try ImageCompressor.compress(renderedImage, format: job.targetFormat)
+            } else {
+                encodedData = try ImageEncoder.encode(renderedImage, format: job.targetFormat, quality: job.quality)
+            }
         } catch let error as ConversionError {
             ConvertLog.conversion.error("Encoding failed for \(job.sourceURL.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
             throw error

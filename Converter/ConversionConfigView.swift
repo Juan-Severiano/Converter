@@ -30,7 +30,11 @@ struct ConversionConfigView: View {
                     if case .configuring = session.state_ {
                         glassify(sizeSection)
                         if session.targetFormat.supportsQuality {
-                            glassify(qualitySection)
+                            if session.isResizeOnly {
+                                glassify(compressSection)
+                            } else {
+                                glassify(qualitySection)
+                            }
                         }
                     }
 
@@ -251,6 +255,24 @@ struct ConversionConfigView: View {
                 step: 1
             )
             .accessibilityValue("\(session.quality) percent")
+        }
+        .padding(14)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    // MARK: - Compress
+
+    private var compressSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: $session.compress) {
+                Label("Compress", systemImage: "arrow.down.right.and.arrow.up.left")
+                    .font(.headline)
+            }
+            .toggleStyle(.switch)
+
+            Text("Automatically finds the smallest file size that still looks right — no quality number to pick, the way online compressors do.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(14)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
