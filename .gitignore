@@ -12,3 +12,6 @@ Packages/
 
 # macOS
 .DS_Store
+
+# Local build validation
+.build-ci-validation/

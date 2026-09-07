@@ -1,0 +1,112 @@
+name: Release DMG
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, for example v1.0.0
+        required: true
+        type: string
+      prerelease:
+        description: Mark the GitHub release as a prerelease
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Sign, notarize, and publish
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: release
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          RELEASE_TAG="${INPUT_TAG:-$REF_NAME}"
+          [[ "$RELEASE_TAG" =~ ^v[0-9] ]] || {
+            echo "Release tags must start with v followed by a number, for example v1.0.0." >&2
+            exit 1
+          }
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Install Developer ID certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          echo "$BUILD_CERTIFICATE_BASE64" | base64 -D > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" | tee "$RUNNER_TEMP/signing-identities.txt"
+          grep -F -- "$DEVELOPER_ID_APPLICATION" "$RUNNER_TEMP/signing-identities.txt" >/dev/null
+
+      - name: Install App Store Connect API key
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+        run: |
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          echo "$APPLE_API_KEY_BASE64" | base64 -D > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "NOTARIZATION_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Archive and notarize DMG
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          SIGNING_IDENTITY: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+          NOTARIZATION_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          OUTPUT_DIR: ${{ github.workspace }}/dist
+        run: scripts/build-release-dmg.sh
+
+      - name: Upload notarized DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Convert-${{ steps.release.outputs.tag }}
+          path: dist/Convert-*.dmg
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          DMG_PATH="dist/Convert-${RELEASE_TAG#v}.dmg"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$DMG_PATH#Convert for macOS" --clobber
+          elif [[ "$PRERELEASE" == "true" ]]; then
+            gh release create "$RELEASE_TAG" "$DMG_PATH#Convert for macOS" --title "Convert $RELEASE_TAG" --generate-notes --prerelease
+          else
+            gh release create "$RELEASE_TAG" "$DMG_PATH#Convert for macOS" --title "Convert $RELEASE_TAG" --generate-notes
+          fi
+
+      - name: Remove temporary keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
