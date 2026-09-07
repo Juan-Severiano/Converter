@@ -16,37 +16,27 @@ final class AppModel: ObservableObject {
     @Published var pendingWindowRequest: UUID?
     @Published var incomingJobErrorMessage: String?
 
-    private let sharedDefaults = UserDefaults(suiteName: AppGroupJobStore.appGroupIdentifier)
+    private let sharedDefaults = UserDefaults.standard
 
     var defaultQuality: Int {
-        let stored = sharedDefaults?.integer(forKey: "defaultQuality") ?? 0
+        let stored = sharedDefaults.integer(forKey: "defaultQuality")
         return stored == 0 ? 85 : stored
     }
 
-    /// Handles `convert://open-job?id=<uuid>`, opened by the Finder Sync extension after it wrote
-    /// a `PendingJob` into the shared App Group container.
+    /// Handles a `convert://open-job` URL opened by the Finder Sync extension.
     func handleIncomingURL(_ url: URL) {
-        guard
-            url.scheme == "convert", url.host == "open-job",
-            let idString = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?.first(where: { $0.name == "id" })?.value,
-            let id = UUID(uuidString: idString)
-        else { return }
-
         do {
-            let pendingJob = try AppGroupJobStore.read(id: id)
-            AppGroupJobStore.remove(id: id)
+            NSLog("[DEBUG-finderhandoff] app received URL")
+            let pendingJob = try FinderJobURL.job(from: url)
+            NSLog("[DEBUG-finderhandoff] app decoded files=\(pendingJob.files.count) format=\(pendingJob.targetFormat.rawValue)")
 
             var files: [ConversionSourceFile] = []
-            var accesses: [SecurityScopedFolderAccess] = []
             for pendingFile in pendingJob.files {
-                let access = try SecurityScopedBookmark.resolveFolderAccess(pendingFile.folderBookmark)
-                accesses.append(access)
-                let fileURL = access.fileURL(named: pendingFile.fileName)
+                let fileURL = pendingFile.sourceURL
                 files.append(
                     ConversionSourceFile(
                         url: fileURL,
-                        fileName: pendingFile.fileName,
+                        fileName: fileURL.lastPathComponent,
                         pixelSize: FileMetadata.pixelSize(of: fileURL),
                         byteSize: FileMetadata.byteSize(of: fileURL)
                     )
@@ -56,12 +46,12 @@ final class AppModel: ObservableObject {
             let session = ConversionSession(
                 files: files,
                 targetFormat: pendingJob.targetFormat,
-                defaultQuality: pendingJob.quality ?? defaultQuality,
-                folderAccesses: accesses
+                defaultQuality: pendingJob.quality ?? defaultQuality
             )
             sessions[session.id] = session
             pendingWindowRequest = session.id
         } catch {
+            NSLog("[DEBUG-finderhandoff] app failed: \(error)")
             incomingJobErrorMessage = "Convert couldn't open the file(s) sent from Finder."
         }
     }
@@ -85,7 +75,6 @@ final class AppModel: ObservableObject {
     }
 
     func removeSession(_ id: UUID) {
-        sessions[id]?.releaseSecurityScopedAccess()
         sessions[id] = nil
     }
 }

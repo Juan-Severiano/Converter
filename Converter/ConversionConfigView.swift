@@ -18,27 +18,58 @@ struct ConversionConfigView: View {
     @State private var thumbnail: NSImage?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Convert to \(session.targetFormat.displayName)")
-                .font(.title3.weight(.semibold))
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+                .ignoresSafeArea()
 
-            fileSummary
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    header
+                    glassify(fileSummary)
 
-            if case .configuring = session.state_ {
-                sizeSection
-                if session.targetFormat.supportsQuality {
-                    qualitySection
+                    if case .configuring = session.state_ {
+                        glassify(sizeSection)
+                        if session.targetFormat.supportsQuality {
+                            glassify(qualitySection)
+                        }
+                    }
+
+                    footer
                 }
+                .padding(18)
             }
-
-            Divider()
-
-            footer
         }
-        .padding(20)
-        .frame(minWidth: 380, idealWidth: 420, minHeight: 320)
+        .frame(minWidth: 420, idealWidth: 500, minHeight: 400)
         .task {
             thumbnail = await loadThumbnail()
+        }
+    }
+
+    @ViewBuilder
+    private func glassify<Content: View>(_ content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.glassEffect(.regular, in: .rect(cornerRadius: 18))
+        } else {
+            content
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 38, height: 38)
+                .background(.thinMaterial, in: Circle())
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Convert to")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(session.targetFormat.displayName)
+                    .font(.title2.weight(.semibold))
+            }
+            Spacer()
         }
     }
 
@@ -55,7 +86,7 @@ struct ConversionConfigView: View {
                 }
             }
             .frame(width: 56, height: 56)
-            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
 
             VStack(alignment: .leading, spacing: 2) {
                 if session.files.count == 1, let file = session.files.first {
@@ -73,6 +104,12 @@ struct ConversionConfigView: View {
                 }
             }
             Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(.white.opacity(0.14))
         }
         .accessibilityElement(children: .combine)
     }
@@ -139,9 +176,14 @@ struct ConversionConfigView: View {
 
     private var sizeSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Size")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            HStack {
+                Label("Size", systemImage: "arrow.up.left.and.arrow.down.right")
+                    .font(.headline)
+                Spacer()
+                Text(resolvedSizeLabel)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
 
             Picker("Size preset", selection: sizeChoiceBinding) {
                 Text("Original").tag(SizeChoice.original)
@@ -152,8 +194,8 @@ struct ConversionConfigView: View {
                 Text("Custom").tag(SizeChoice.custom)
             }
             .labelsHidden()
-            .pickerStyle(.menu)
-            .frame(maxWidth: 180)
+            .pickerStyle(.segmented)
+            .controlSize(.small)
 
             HStack(spacing: 8) {
                 TextField("Width", value: widthBinding, formatter: Self.dimensionFormatter)
@@ -170,21 +212,33 @@ struct ConversionConfigView: View {
                     .accessibilityLabel("Height")
             }
 
-            Toggle("Maintain aspect ratio", isOn: $session.maintainAspectRatio)
+            Toggle(isOn: $session.maintainAspectRatio) {
+                Label("Lock proportions", systemImage: "link")
+            }
+            .toggleStyle(.checkbox)
+            .font(.caption)
         }
+        .padding(14)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var resolvedSizeLabel: String {
+        if session.resizeMode == .original, let size = session.files.first?.pixelSize {
+            return "\(Int(size.width)) × \(Int(size.height))"
+        }
+        return "\(session.customWidth) × \(session.customHeight)"
     }
 
     // MARK: - Quality
 
     private var qualitySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Quality")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Label("Quality", systemImage: "dial.medium")
+                    .font(.headline)
                 Spacer()
                 Text("\(session.quality)%")
-                    .font(.subheadline.monospacedDigit())
+                    .font(.headline.monospacedDigit())
             }
             Slider(
                 value: Binding(get: { Double(session.quality) }, set: { session.quality = Int($0) }),
@@ -193,6 +247,8 @@ struct ConversionConfigView: View {
             )
             .accessibilityValue("\(session.quality) percent")
         }
+        .padding(14)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
     }
 
     // MARK: - Footer
@@ -202,13 +258,16 @@ struct ConversionConfigView: View {
         switch session.state_ {
         case .configuring:
             HStack {
-                Spacer()
                 Button("Cancel") { closeWindow() }
                     .keyboardShortcut(.cancelAction)
+                    .buttonStyle(.borderless)
+                Spacer()
                 Button("Convert") { session.start() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
             }
+            .padding(.top, 2)
 
         case .converting(let completed, let total):
             VStack(alignment: .leading, spacing: 8) {
@@ -221,8 +280,11 @@ struct ConversionConfigView: View {
                 HStack {
                     Spacer()
                     Button("Cancel") { session.cancel() }
+                        .buttonStyle(.borderless)
                 }
             }
+            .padding(14)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
 
         case .finished(let succeeded, let failed):
             VStack(alignment: .leading, spacing: 8) {
@@ -239,12 +301,19 @@ struct ConversionConfigView: View {
                     }
                 }
                 HStack {
+                    if !succeeded.isEmpty {
+                        Button("Show in Finder") {
+                            NSWorkspace.shared.activateFileViewerSelecting(succeeded.map(\.outputURL))
+                        }
+                    }
                     Spacer()
                     Button("Done") { closeWindow() }
                         .keyboardShortcut(.defaultAction)
                         .buttonStyle(.borderedProminent)
                 }
             }
+            .padding(14)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
 
         case .cancelled:
             HStack {

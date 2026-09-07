@@ -17,8 +17,7 @@ enum ConversionSessionState {
     case cancelled
 }
 
-/// Per-window state backing one "Convert to X" configuration + progress view. Owns whatever
-/// security-scoped folder access the job needed, releasing it once the window closes.
+/// Per-window state backing one "Convert to X" configuration + progress view.
 @MainActor
 final class ConversionSession: ObservableObject, Identifiable {
     let id = UUID()
@@ -32,19 +31,16 @@ final class ConversionSession: ObservableObject, Identifiable {
     @Published var quality: Int
     @Published private(set) var state: ConversionSessionState = .configuring
 
-    private let folderAccesses: [SecurityScopedFolderAccess]
     private var runningTask: Task<Void, Never>?
 
     init(
         files: [ConversionSourceFile],
         targetFormat: OutputFormat,
-        defaultQuality: Int,
-        folderAccesses: [SecurityScopedFolderAccess] = []
+        defaultQuality: Int
     ) {
         self.files = files
         self.targetFormat = targetFormat
         self.quality = max(1, min(100, defaultQuality))
-        self.folderAccesses = folderAccesses
 
         let originalSize = files.first?.pixelSize ?? CGSize(width: 512, height: 512)
         self.customWidth = max(1, Int(originalSize.width))
@@ -130,9 +126,4 @@ final class ConversionSession: ObservableObject, Identifiable {
         runningTask?.cancel()
     }
 
-    func releaseSecurityScopedAccess() {
-        for access in folderAccesses {
-            access.release()
-        }
-    }
 }

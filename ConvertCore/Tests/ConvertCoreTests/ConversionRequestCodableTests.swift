@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import ConvertCore
 
-/// `ConversionRequest` is the exact JSON contract the Finder Sync extension writes into the shared
-/// App Group container and the main app reads back — a schema break here fails silently in
+/// `ConversionRequest` is the exact JSON contract the Finder Sync extension writes into Convert's
+/// local handoff folder and the main app reads back — a schema break here fails silently in
 /// production (the app just never opens the job), so it gets its own round-trip test.
 @Suite("ConversionRequest Codable round-trip")
 struct ConversionRequestCodableTests {

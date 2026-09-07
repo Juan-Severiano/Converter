@@ -1,22 +1,19 @@
 import Foundation
 
-/// One file within a `PendingJob`: a security-scoped bookmark to its *containing folder* (not the
-/// file itself), plus the file's own name. A folder-level bookmark is what actually grants the main
-/// app permission to write the converted file back into that same folder under App Sandbox — a
-/// file-level bookmark alone would only grant access to that one existing file, not to creating a
-/// new sibling next to it.
+/// One file within a `PendingJob`.
+///
+/// Convert's development build deliberately runs outside App Sandbox, so the Finder extension can
+/// pass the selected file URL straight to the main app and the main app can create a sibling file.
 public struct PendingFile: Codable, Equatable, Sendable {
-    public let folderBookmark: Data
-    public let fileName: String
+    public let sourceURL: URL
 
-    public init(folderBookmark: Data, fileName: String) {
-        self.folderBookmark = folderBookmark
-        self.fileName = fileName
+    public init(sourceURL: URL) {
+        self.sourceURL = sourceURL
     }
 }
 
 /// What the Finder Sync extension hands off to the main app: the files the user picked in Finder,
-/// via security-scoped bookmarks the sandboxed app can actually act on, plus the conversion options.
+/// plus the conversion options.
 public struct PendingJob: Codable, Identifiable, Equatable, Sendable {
     public let id: UUID
     public var files: [PendingFile]

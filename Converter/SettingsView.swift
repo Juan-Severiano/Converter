@@ -12,7 +12,7 @@ import ConvertCore
 import SwiftUI
 
 struct SettingsView: View {
-    private static let defaults = UserDefaults(suiteName: AppGroupJobStore.appGroupIdentifier)
+    private static let defaults = UserDefaults.standard
 
     @AppStorage("outputLocation", store: SettingsView.defaults)
     private var outputLocationRaw: String = OutputLocation.sameFolder.rawValue

@@ -50,8 +50,9 @@ class FinderSync: FIFinderSync {
         let submenu = NSMenu(title: "Convert")
         for format in formats {
             let item = NSMenuItem(title: format.displayName, action: #selector(convert(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = format.rawValue
+            // Finder Sync supports `tag` for menu payloads. It does not guarantee preservation of
+            // target or representedObject when it transfers an NSMenu across the extension boundary.
+            item.tag = OutputFormat.allCases.firstIndex(of: format) ?? -1
             submenu.addItem(item)
         }
         convertItem.submenu = submenu
@@ -61,31 +62,27 @@ class FinderSync: FIFinderSync {
         return menu
     }
 
-    @objc private func convert(_ sender: NSMenuItem) {
-        guard
-            let rawFormat = sender.representedObject as? String,
-            let format = OutputFormat(rawValue: rawFormat)
-        else { return }
-
+    @objc func convert(_ sender: NSMenuItem) {
+        NSLog("[DEBUG-finderhandoff] extension action invoked")
+        guard sender.tag >= 0, sender.tag < OutputFormat.allCases.count else {
+            NSLog("[DEBUG-finderhandoff] extension action missing payload")
+            return
+        }
+        let format = OutputFormat.allCases[sender.tag]
         let selectedURLs = FIFinderSyncController.default().selectedItemURLs() ?? []
+        NSLog("[DEBUG-finderhandoff] extension selected files=\(selectedURLs.count) format=\(format.rawValue)")
         guard !selectedURLs.isEmpty else { return }
 
         do {
-            let files = try selectedURLs.map { url in
-                PendingFile(folderBookmark: try SecurityScopedBookmark.makeFolderBookmark(for: url), fileName: url.lastPathComponent)
-            }
-            let job = PendingJob(files: files, targetFormat: format)
-            try AppGroupJobStore.write(job)
-
-            var components = URLComponents()
-            components.scheme = "convert"
-            components.host = "open-job"
-            components.queryItems = [URLQueryItem(name: "id", value: job.id.uuidString)]
-            if let url = components.url {
-                NSWorkspace.shared.open(url)
+            let job = FinderSelectionSnapshot(fileURLs: selectedURLs).pendingJob(targetFormat: format)
+            let handoffURL = try FinderJobURL.make(job: job)
+            let didOpen = NSWorkspace.shared.open(handoffURL)
+            NSLog("[DEBUG-finderhandoff] extension files=\(job.files.count) format=\(format.rawValue) open=\(didOpen)")
+            guard didOpen else {
+                throw NSError(domain: "ConvertFinderExtension", code: 1, userInfo: nil)
             }
         } catch {
-            NSLog("Convert extension: failed to hand off job — \(error)")
+            NSLog("[DEBUG-finderhandoff] extension failed: \(error)")
         }
     }
 }

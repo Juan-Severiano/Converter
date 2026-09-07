@@ -3,7 +3,7 @@ import Foundation
 /// A batch conversion request covering one or more files with shared target format and options.
 ///
 /// This is the payload handed off between the Finder Sync extension and the main app (encoded as
-/// JSON in the shared App Group container), and the shape drag-and-drop batches use internally.
+/// JSON in Convert's local handoff folder), and the shape drag-and-drop batches use internally.
 public struct ConversionRequest: Codable, Identifiable, Equatable, Sendable {
     public let id: UUID
     public var sourceFileURLs: [URL]
