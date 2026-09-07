@@ -12,9 +12,10 @@ public struct FinderSelectionSnapshot: Sendable, Equatable {
 
     public func pendingJob(
         targetFormat: OutputFormat,
-        quality: Int? = nil
+        quality: Int? = nil,
+        isResizeOnly: Bool = false
     ) -> PendingJob {
         let files = fileURLs.map(PendingFile.init(sourceURL:))
-        return PendingJob(files: files, targetFormat: targetFormat, quality: quality)
+        return PendingJob(files: files, targetFormat: targetFormat, quality: quality, isResizeOnly: isResizeOnly)
     }
 }

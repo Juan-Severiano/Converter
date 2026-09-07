@@ -56,18 +56,23 @@ struct ConversionConfigView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 10) {
-            Image(systemName: "arrow.triangle.2.circlepath")
+            Image(systemName: session.isResizeOnly ? "arrow.up.left.and.arrow.down.right" : "arrow.triangle.2.circlepath")
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(.tint)
                 .frame(width: 38, height: 38)
                 .background(.thinMaterial, in: Circle())
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Convert to")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(session.targetFormat.displayName)
-                    .font(.title2.weight(.semibold))
+                if session.isResizeOnly {
+                    Text("Resize")
+                        .font(.title2.weight(.semibold))
+                } else {
+                    Text("Convert to")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(session.targetFormat.displayName)
+                        .font(.title2.weight(.semibold))
+                }
             }
             Spacer()
         }
@@ -262,7 +267,7 @@ struct ConversionConfigView: View {
                     .keyboardShortcut(.cancelAction)
                     .buttonStyle(.borderless)
                 Spacer()
-                Button("Convert") { session.start() }
+                Button(session.isResizeOnly ? "Resize" : "Convert") { session.start() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)

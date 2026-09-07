@@ -21,6 +21,9 @@ public struct PendingJob: Codable, Identifiable, Equatable, Sendable {
     public var resize: ResizeSpec
     public var quality: Int?
     public var keepOriginal: Bool
+    /// True when this job came from Finder's standalone "Resize" item rather than a "Convert to
+    /// X" pick — `targetFormat` is then just the selection's own format, kept as-is.
+    public var isResizeOnly: Bool
 
     public init(
         id: UUID = UUID(),
@@ -28,7 +31,8 @@ public struct PendingJob: Codable, Identifiable, Equatable, Sendable {
         targetFormat: OutputFormat,
         resize: ResizeSpec = .original,
         quality: Int? = nil,
-        keepOriginal: Bool = true
+        keepOriginal: Bool = true,
+        isResizeOnly: Bool = false
     ) {
         self.id = id
         self.files = files
@@ -36,5 +40,6 @@ public struct PendingJob: Codable, Identifiable, Equatable, Sendable {
         self.resize = resize
         self.quality = quality.map { max(1, min(100, $0)) }
         self.keepOriginal = keepOriginal
+        self.isResizeOnly = isResizeOnly
     }
 }

@@ -1,5 +1,5 @@
 /// The image format Convert detected for a source file.
-public enum FileKind: String, CaseIterable, Sendable {
+public enum FileKind: String, CaseIterable, Sendable, Equatable {
     case png
     case jpeg
     case heic

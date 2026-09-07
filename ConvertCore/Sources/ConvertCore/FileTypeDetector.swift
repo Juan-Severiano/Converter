@@ -33,6 +33,17 @@ public enum FileTypeDetector {
         return OutputFormat.allCases.filter { common.contains($0) }
     }
 
+    /// The format a resize-only pass would re-encode to: the selection's own shared format, so
+    /// resizing never silently changes what the files are. `nil` when the selection is empty,
+    /// mixes formats, or is a format Convert can't re-encode to (GIF, BMP, SVG).
+    public static func resizeOnlyFormat(forFiles fileURLs: [URL]) -> OutputFormat? {
+        guard let first = fileURLs.first, let firstKind = detect(fileURL: first) else { return nil }
+        for url in fileURLs.dropFirst() {
+            guard detect(fileURL: url) == firstKind else { return nil }
+        }
+        return firstKind.matchingOutputFormat
+    }
+
     private static func resolvedType(for fileURL: URL) -> UTType? {
         if let values = try? fileURL.resourceValues(forKeys: [.contentTypeKey]), let type = values.contentType {
             return type

@@ -42,39 +42,59 @@ class FinderSync: FIFinderSync {
         guard !selectedURLs.isEmpty else { return nil }
 
         let formats = FileTypeDetector.availableOutputFormats(forFiles: selectedURLs)
-        guard !formats.isEmpty else { return nil }
-
-        let convertItem = NSMenuItem(title: "Convert", action: nil, keyEquivalent: "")
-        convertItem.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)
-
-        let submenu = NSMenu(title: "Convert")
-        for format in formats {
-            let item = NSMenuItem(title: format.displayName, action: #selector(convert(_:)), keyEquivalent: "")
-            // Finder Sync supports `tag` for menu payloads. It does not guarantee preservation of
-            // target or representedObject when it transfers an NSMenu across the extension boundary.
-            item.tag = OutputFormat.allCases.firstIndex(of: format) ?? -1
-            submenu.addItem(item)
-        }
-        convertItem.submenu = submenu
+        let resizeFormat = FileTypeDetector.resizeOnlyFormat(forFiles: selectedURLs)
+        guard !formats.isEmpty || resizeFormat != nil else { return nil }
 
         let menu = NSMenu(title: "")
-        menu.addItem(convertItem)
+
+        if let resizeFormat {
+            let resizeItem = NSMenuItem(title: "Resize", action: #selector(resize(_:)), keyEquivalent: "")
+            resizeItem.image = NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: nil)
+            resizeItem.tag = OutputFormat.allCases.firstIndex(of: resizeFormat) ?? -1
+            menu.addItem(resizeItem)
+        }
+
+        if !formats.isEmpty {
+            let convertItem = NSMenuItem(title: "Convert", action: nil, keyEquivalent: "")
+            convertItem.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)
+
+            let submenu = NSMenu(title: "Convert")
+            for format in formats {
+                let item = NSMenuItem(title: format.displayName, action: #selector(convert(_:)), keyEquivalent: "")
+                // Finder Sync supports `tag` for menu payloads. It does not guarantee preservation of
+                // target or representedObject when it transfers an NSMenu across the extension boundary.
+                item.tag = OutputFormat.allCases.firstIndex(of: format) ?? -1
+                submenu.addItem(item)
+            }
+            convertItem.submenu = submenu
+            menu.addItem(convertItem)
+        }
+
         return menu
     }
 
     @objc func convert(_ sender: NSMenuItem) {
-        NSLog("[DEBUG-finderhandoff] extension action invoked")
-        guard sender.tag >= 0, sender.tag < OutputFormat.allCases.count else {
+        handOff(formatTag: sender.tag, isResizeOnly: false, logTag: "convert")
+    }
+
+    @objc func resize(_ sender: NSMenuItem) {
+        handOff(formatTag: sender.tag, isResizeOnly: true, logTag: "resize")
+    }
+
+    private func handOff(formatTag: Int, isResizeOnly: Bool, logTag: String) {
+        NSLog("[DEBUG-finderhandoff] extension action invoked (\(logTag))")
+        guard formatTag >= 0, formatTag < OutputFormat.allCases.count else {
             NSLog("[DEBUG-finderhandoff] extension action missing payload")
             return
         }
-        let format = OutputFormat.allCases[sender.tag]
+        let format = OutputFormat.allCases[formatTag]
         let selectedURLs = FIFinderSyncController.default().selectedItemURLs() ?? []
-        NSLog("[DEBUG-finderhandoff] extension selected files=\(selectedURLs.count) format=\(format.rawValue)")
+        NSLog("[DEBUG-finderhandoff] extension selected files=\(selectedURLs.count) format=\(format.rawValue) resizeOnly=\(isResizeOnly)")
         guard !selectedURLs.isEmpty else { return }
 
         do {
-            let job = FinderSelectionSnapshot(fileURLs: selectedURLs).pendingJob(targetFormat: format)
+            let job = FinderSelectionSnapshot(fileURLs: selectedURLs)
+                .pendingJob(targetFormat: format, isResizeOnly: isResizeOnly)
             let handoffURL = try FinderJobURL.make(job: job)
             let didOpen = NSWorkspace.shared.open(handoffURL)
             NSLog("[DEBUG-finderhandoff] extension files=\(job.files.count) format=\(format.rawValue) open=\(didOpen)")

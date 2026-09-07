@@ -46,7 +46,8 @@ final class AppModel: ObservableObject {
             let session = ConversionSession(
                 files: files,
                 targetFormat: pendingJob.targetFormat,
-                defaultQuality: pendingJob.quality ?? defaultQuality
+                defaultQuality: pendingJob.quality ?? defaultQuality,
+                isResizeOnly: pendingJob.isResizeOnly
             )
             sessions[session.id] = session
             pendingWindowRequest = session.id
@@ -56,7 +57,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func makeSession(forDroppedFiles urls: [URL], targetFormat: OutputFormat) -> ConversionSession {
+    func makeSession(forDroppedFiles urls: [URL], targetFormat: OutputFormat, isResizeOnly: Bool = false) -> ConversionSession {
         let files = urls.map { url in
             ConversionSourceFile(
                 url: url,
@@ -65,7 +66,12 @@ final class AppModel: ObservableObject {
                 byteSize: FileMetadata.byteSize(of: url)
             )
         }
-        let session = ConversionSession(files: files, targetFormat: targetFormat, defaultQuality: defaultQuality)
+        let session = ConversionSession(
+            files: files,
+            targetFormat: targetFormat,
+            defaultQuality: defaultQuality,
+            isResizeOnly: isResizeOnly
+        )
         sessions[session.id] = session
         return session
     }

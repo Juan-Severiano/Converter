@@ -24,6 +24,9 @@ final class ConversionSession: ObservableObject, Identifiable {
     let files: [ConversionSourceFile]
 
     @Published var targetFormat: OutputFormat
+    /// True when this session came from Finder's standalone "Resize" item: the format is the
+    /// selection's own, kept as-is, so the UI reads "Resize" rather than "Convert to X".
+    let isResizeOnly: Bool
     @Published var resizeMode: ResizeSpec.Mode = .original
     @Published var customWidth: Int
     @Published var customHeight: Int
@@ -36,10 +39,12 @@ final class ConversionSession: ObservableObject, Identifiable {
     init(
         files: [ConversionSourceFile],
         targetFormat: OutputFormat,
-        defaultQuality: Int
+        defaultQuality: Int,
+        isResizeOnly: Bool = false
     ) {
         self.files = files
         self.targetFormat = targetFormat
+        self.isResizeOnly = isResizeOnly
         self.quality = max(1, min(100, defaultQuality))
 
         let originalSize = files.first?.pixelSize ?? CGSize(width: 512, height: 512)

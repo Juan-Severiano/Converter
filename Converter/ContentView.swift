@@ -21,6 +21,10 @@ struct ContentView: View {
         FileTypeDetector.availableOutputFormats(forFiles: droppedURLs)
     }
 
+    private var resizeFormat: OutputFormat? {
+        FileTypeDetector.resizeOnlyFormat(forFiles: droppedURLs)
+    }
+
     var body: some View {
         Group {
             if droppedURLs.isEmpty {
@@ -92,10 +96,21 @@ struct ContentView: View {
             .listStyle(.inset)
             .frame(minHeight: 120)
 
+            if let resizeFormat {
+                Button {
+                    beginConversion(to: resizeFormat, isResizeOnly: true)
+                } label: {
+                    Label("Resize", systemImage: "arrow.up.left.and.arrow.down.right")
+                }
+                .buttonStyle(.bordered)
+            }
+
             if availableFormats.isEmpty {
-                Text("These files don't share a format Convert can produce.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                if resizeFormat == nil {
+                    Text("These files don't share a format Convert can produce.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
             } else {
                 Text("Convert to")
                     .font(.subheadline)
@@ -142,8 +157,8 @@ struct ContentView: View {
         }
     }
 
-    private func beginConversion(to format: OutputFormat) {
-        let session = appModel.makeSession(forDroppedFiles: droppedURLs, targetFormat: format)
+    private func beginConversion(to format: OutputFormat, isResizeOnly: Bool = false) {
+        let session = appModel.makeSession(forDroppedFiles: droppedURLs, targetFormat: format, isResizeOnly: isResizeOnly)
         droppedURLs = []
         openWindow(id: "conversion", value: session.id)
     }
