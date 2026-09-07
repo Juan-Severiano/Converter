@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @EnvironmentObject private var appModel: AppModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     @State private var droppedURLs: [URL] = []
     @State private var isTargeted = false
@@ -34,6 +35,11 @@ struct ContentView: View {
             guard let id = newValue else { return }
             openWindow(id: "conversion", value: id)
             appModel.pendingWindowRequest = nil
+            // Opening from Finder should feel like Preview: jump straight to the
+            // file and skip the idle drop screen if it's still just sitting empty.
+            if droppedURLs.isEmpty {
+                dismissWindow()
+            }
         }
         .alert("Couldn't open file", isPresented: errorBinding) {
             Button("OK", role: .cancel) {}
